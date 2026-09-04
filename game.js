@@ -164,6 +164,69 @@ class ShootingStar extends Asteroid {
   }
 }
 
+// ── Skins ─────────────────────────────────────────────────────────────────────
+const SKINS = [
+  {
+    id: 'classic',
+    name: 'CLÁSICA',
+    color: '#ffffff',
+    boostColor: '#00FF00',
+    flameColor: 'rgba(255, 130, 0, 0.85)',
+    boostFlameColor: 'rgba(0, 255, 0, 0.85)',
+    verts: [[20, 0], [-12, -9], [-7, 0], [-12, 9]],
+    flameBase: [[-8, -4], [-8, 4]],
+  },
+  {
+    id: 'lancer',
+    name: 'LANCERO',
+    color: '#00F5FF',
+    boostColor: '#00FF00',
+    flameColor: 'rgba(0, 245, 255, 0.85)',
+    boostFlameColor: 'rgba(0, 255, 0, 0.85)',
+    verts: [[26, 0], [-10, -4], [-6, 0], [-10, 4]],
+    flameBase: [[-7, -3], [-7, 3]],
+  },
+  {
+    id: 'wings',
+    name: 'ALA ANCHA',
+    color: '#FF00FF',
+    boostColor: '#00FF00',
+    flameColor: 'rgba(255, 0, 200, 0.85)',
+    boostFlameColor: 'rgba(0, 255, 0, 0.85)',
+    verts: [[20, 0], [-4, -5], [-18, -15], [-18, 15], [-4, 5]],
+    flameBase: [[-6, -5], [-6, 5]],
+  },
+  {
+    id: 'heavy',
+    name: 'PESADA',
+    color: '#FFD700',
+    boostColor: '#00FF00',
+    flameColor: 'rgba(255, 180, 60, 0.9)',
+    boostFlameColor: 'rgba(0, 255, 0, 0.9)',
+    verts: [[16, 0], [-2, -10], [-14, -10], [-14, 10], [-2, 10]],
+    flameBase: [[-8, -6], [-8, 6]],
+  },
+];
+
+const SKIN_STORAGE_KEY = 'asteroids-skin';
+let skinIndex = 0;
+
+function selectSkin(i) {
+  skinIndex = (i + SKINS.length) % SKINS.length;
+  try {
+    localStorage.setItem(SKIN_STORAGE_KEY, SKINS[skinIndex].id);
+  } catch (_) {}
+}
+
+function restoreSkin() {
+  try {
+    const found = SKINS.findIndex(s => s.id === localStorage.getItem(SKIN_STORAGE_KEY));
+    skinIndex = found >= 0 ? found : 0;
+  } catch (_) {
+    skinIndex = 0;
+  }
+}
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
   constructor() { this.reset(); }
@@ -225,31 +288,33 @@ class Ship {
     // Parpadeo durante invencibilidad de reaparición
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
+    const skin   = SKINS[skinIndex];
+    const boosted = speedBoostTimer > 0;
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    // Color del ship: verde si boost activo, blanco si no
-    ctx.strokeStyle = speedBoostTimer > 0 ? '#00FF00' : '#fff';
+
+    ctx.strokeStyle = boosted ? skin.boostColor : skin.color;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
 
-    // Silueta clásica: triángulo con muesca trasera
     ctx.beginPath();
-    ctx.moveTo( 20,  0);   // nariz
-    ctx.lineTo(-12, -9);   // ala izquierda
-    ctx.lineTo( -7,  0);   // muesca trasera
-    ctx.lineTo(-12,  9);   // ala derecha
+    ctx.moveTo(skin.verts[0][0], skin.verts[0][1]);
+    for (let i = 1; i < skin.verts.length; i++)
+      ctx.lineTo(skin.verts[i][0], skin.verts[i][1]);
     ctx.closePath();
     ctx.stroke();
 
     // Llama del propulsor
     if (this.thrusting && Math.random() > 0.35) {
+      const [ax, ay] = skin.flameBase[0];
+      const [bx, by] = skin.flameBase[1];
       ctx.beginPath();
-      ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
-      ctx.lineTo(-8,  4);
-      // Llama verde si boost, naranja si no
-      ctx.strokeStyle = speedBoostTimer > 0 ? 'rgba(0, 255, 0, 0.85)' : 'rgba(255, 130, 0, 0.85)';
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax - rand(6, 14), 0);
+      ctx.lineTo(bx, by);
+      ctx.strokeStyle = boosted ? skin.boostFlameColor : skin.flameColor;
       ctx.stroke();
     }
 
@@ -439,6 +504,11 @@ function killShip() {
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  const SKIN_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4'];
+  for (let i = 0; i < SKIN_KEYS.length; i++) {
+    if (pressed(SKIN_KEYS[i])) selectSkin(i);
+  }
+
   if (state === 'gameover') {
     if (pressed('Space')) initGame();
     particles.forEach(p => p.update(dt));
@@ -536,17 +606,17 @@ function update(dt) {
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function drawLifeIcon(x, y) {
+  const skin = SKINS[skinIndex];
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.strokeStyle = '#fff';
+  ctx.strokeStyle = skin.color;
   ctx.lineWidth   = 1.2;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
-  ctx.moveTo( 9,  0);
-  ctx.lineTo(-6, -5);
-  ctx.lineTo(-3,  0);
-  ctx.lineTo(-6,  5);
+  ctx.moveTo(skin.verts[0][0] * 0.5, skin.verts[0][1] * 0.5);
+  for (let i = 1; i < skin.verts.length; i++)
+    ctx.lineTo(skin.verts[i][0] * 0.5, skin.verts[i][1] * 0.5);
   ctx.closePath();
   ctx.stroke();
   ctx.restore();
@@ -564,6 +634,11 @@ function drawHUD() {
 
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`SKIN: ${SKINS[skinIndex].name} (1-4)`, 14, H - 14);
 
   // Speed boost indicator
   if (speedBoostTimer > 0) {
@@ -631,5 +706,6 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
+restoreSkin();
 initGame();
 requestAnimationFrame(loop);
