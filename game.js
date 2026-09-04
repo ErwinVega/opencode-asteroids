@@ -61,6 +61,7 @@ class Bullet {
 const RADII  = [0, 16, 30, 50];   // por tamaño 1, 2, 3
 const SPEEDS = [0, 85, 55, 32];   // velocidad base por tamaño
 const POINTS = [0, 100, 50, 20];  // puntos por tamaño
+const SHOOTING_STAR_CHANCE = 0.15;
 
 class Asteroid {
   constructor(x, y, size = 3) {
@@ -76,6 +77,7 @@ class Asteroid {
     this.vy = Math.sin(angle) * speed;
     this.rotSpeed = rand(-1.2, 1.2);
     this.rot = rand(0, Math.PI * 2);
+    this.color = '#fff';
 
     // Polígono irregular
     const n = randInt(8, 13);
@@ -105,7 +107,7 @@ class Asteroid {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = this.color;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
     ctx.beginPath();
@@ -115,6 +117,50 @@ class Asteroid {
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
+  }
+}
+
+// ── Estrella fugaz ─────────────────────────────────────────────────────────────
+class ShootingStar extends Asteroid {
+  constructor(x, y) {
+    super(x, y, 3);
+    const speed = rand(200, 280);
+    const angle = rand(0, Math.PI * 2);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.ttl    = rand(5, 7);
+    this.trail  = [];
+    this.color  = '#00F5FF';
+    this.points = 150;
+  }
+
+  update(dt) {
+    super.update(dt);
+    this.ttl -= dt;
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > 12) this.trail.shift();
+    if (this.ttl <= 0) {
+      this.dead = true;
+      explode(this.x, this.y, 8);
+    }
+  }
+
+  draw() {
+    for (let i = 1; i < this.trail.length; i++) {
+      const t = i / this.trail.length;
+      ctx.strokeStyle = `rgba(0, 245, 255, ${t * 0.5})`;
+      ctx.lineWidth = t * 2;
+      ctx.beginPath();
+      ctx.moveTo(this.trail[i - 1].x, this.trail[i - 1].y);
+      ctx.lineTo(this.trail[i].x, this.trail[i].y);
+      ctx.stroke();
+    }
+    if (this.ttl < 1 && Math.floor(this.ttl * 8) % 2 === 0) return;
+    super.draw();
+  }
+
+  split() {
+    return [];
   }
 }
 
@@ -311,7 +357,7 @@ function spawnAsteroids(count) {
       x = rand(0, W);
       y = rand(0, H);
     } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
-    asteroids.push(new Asteroid(x, y, 3));
+    asteroids.push(Math.random() < SHOOTING_STAR_CHANCE ? new ShootingStar(x, y) : new Asteroid(x, y, 3));
   }
 }
 
@@ -402,7 +448,7 @@ function update(dt) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += POINTS[a.size];
+        score += a.points ?? POINTS[a.size];
         explode(a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
         // Spawn power-up
